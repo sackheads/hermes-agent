@@ -1204,6 +1204,20 @@ DEFAULT_CONFIG = {
         # External memory provider plugin (empty = built-in only); only ONE at a time: "openviking",
         # "mem0", "hindsight", "holographic", "retaindb", "byterover".
         "provider": "",
+        # === CROSS-CHANNEL START ===
+        # Cross-channel awareness — detect session switches and inject gists.
+        # See gateway/user_context_tracker.py
+        "cross_channel_awareness": False,  # opt-in default
+        "cross_channel": {
+            "window_minutes": 30,
+            "stale_threshold_hours": 2,
+            "injection_mode": "shadow",   # shadow | on-switch | off
+            "budget_minutes": 5,
+            "venue_aware": True,
+            "recency_hint_length": 200,
+            "read_timeout_sec": 0.05,
+        },
+        # === CROSS-CHANNEL END ===
     },
     # Subagent delegation — override the provider:model used by delegate_task so children run on a
     # cheaper/faster model. Uses the same runtime provider resolution as CLI/gateway startup, so
@@ -1542,6 +1556,16 @@ DEFAULT_CONFIG = {
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,
+        # Guardian mode — project-aware smart approvals with an editable prompt file.
+        # enabled: inject workspace snapshot + recent verdict history into the approval LLM prompt.
+        # activity_window: how many recent tool+verdict entries the guardian sees.
+        # prompt_path: explicit guardian prompt path (else <project>/.hermes/guardian-prompt.md,
+        #   then ~/.hermes/guardian-prompt.md).
+        "guardian": {
+            "enabled": False,
+            "activity_window": 10,
+            "prompt_path": "",
+        },
         # Case-insensitive fnmatch globs against terminal commands; a match blocks even under --yolo
         # / mode=off. Quote in YAML when starting with * or containing {}/!/: e.g. "git push
         # --force*".
