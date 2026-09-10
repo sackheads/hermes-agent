@@ -7057,6 +7057,14 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         if await self._abort_startup_if_shutdown_requested():
             return True
         self.delivery_router.adapters = self.adapters
+        # Give each adapter a reference to the delivery router for cross-platform
+        # delivery (e.g., NATS inbox → Discord DM for human-addressed messages).
+        for _adapter in self.adapters.values():
+            if hasattr(_adapter, 'set_delivery_router'):
+                try:
+                    _adapter.set_delivery_router(self.delivery_router)
+                except Exception:
+                    pass
         self._wire_teams_pipeline_runtime()
 
         self._running = True
@@ -10472,6 +10480,77 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         session_entry = self.session_store.get_or_create_session(source)
         session_key = session_entry.session_key
         self._cache_session_source(session_key, source)
+        # === CROSS-CHANNEL START ===
+        # Record this message for cross-channel awareness
+        try:
+            from gateway.user_context_tracker import get_user_context_tracker
+            from hermes_cli.config import cfg_get, load_config
+            _cfg = load_config()
+            if cfg_get(_cfg, "memory", "cross_channel_awareness"):
+                _tracker = get_user_context_tracker()
+                if _tracker:
+                    _tracker.record_message(
+                        user_id=source.user_id or "",
+                        session_key=session_key,
+                        platform=source.platform.value,
+                        guild_id=source.guild_id or "",
+                        channel_name=source.chat_name or "",
+                        chat_type=source.chat_type or "",
+                        sensitivity="restricted" if (source.chat_type or "") == "dm" else "public",
+                        message_text=getattr(event, "text", "") or "",
+                    )
+        except Exception:
+            pass  # never let this block message delivery
+        # === CROSS-CHANNEL END ===
+
+        # === CHECKPOINT TRIGGER START ===
+        # If user switched from an idle session, checkpoint it in Holographic
+        try:
+            from gateway.checkpoint_trigger import get_checkpoint_trigger
+            from gateway.user_context_tracker import get_user_context_tracker
+            from hermes_cli.config import cfg_get, load_config
+            _cfg2 = load_config()
+            if cfg_get(_cfg2, "memory", "cross_channel_awareness"):
+                _tracker2 = get_user_context_tracker()
+                if _tracker2:
+                    _evt = _tracker2.detect_switch(
+                        user_id=source.user_id or "",
+                        session_key=session_key,
+                        platform=source.platform.value,
+                        guild_id=source.guild_id or "",
+                        chat_type=source.chat_type or "",
+                        sensitivity="restricted" if (source.chat_type or "") == "dm" else "public",
+                    )
+                    if _evt:
+                        _idled_key = _evt.previous_session_key
+                        _idled_entry = self.session_store._entries.get(_idled_key)
+                        if _idled_entry and _evt.elapsed_minutes >= 1:
+                            _cp = get_checkpoint_trigger()
+                            if _cp:
+                                _msgs = []
+                                if self._session_db:
+                                    try:
+                                        _msgs = self._session_db.get_messages(_idled_entry.session_id)
+                                    except Exception:
+                                        pass
+                                _sens = "restricted" if _evt.chat_type == "dm" else "public"
+                                _t = threading.Thread(
+                                    target=_cp.on_session_switch,
+                                    kwargs={
+                                        "idled_session_key": _idled_key,
+                                        "idled_session_id": _idled_entry.session_id,
+                                        "channel_name": _evt.previous_channel,
+                                        "sensitivity": _sens,
+                                        "messages": _msgs,
+                                        "user_id": source.user_id or "",
+                                    },
+                                    daemon=True,
+                                )
+                                _t.start()
+        except Exception:
+            pass  # never let checkpoint trigger block message delivery
+        # === CHECKPOINT TRIGGER END ===
+
         if await asyncio.to_thread(self._is_telegram_topic_lane, source):
             try:
                 binding = (await self._session_db.get_telegram_topic_binding(

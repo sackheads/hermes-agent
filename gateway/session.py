@@ -531,6 +531,32 @@ def build_session_context_prompt(
 
     lines.append(f"**Connected Platforms:** {', '.join(platforms_list)}")
 
+    # === CROSS-CHANNEL START ===
+    # Log channel switch events for diagnostics — the V3 injection
+    # is handled by the Holographic prefetch (agent layer).
+    try:
+        from gateway.user_context_tracker import get_user_context_tracker
+        from hermes_cli.config import cfg_get, load_config
+        _cfg = load_config()
+        if cfg_get(_cfg, "memory", "cross_channel_awareness"):
+            _tracker = get_user_context_tracker()
+            if _tracker and _tracker._injection_mode == "on-switch":
+                _evt = _tracker.detect_switch(
+                    user_id=context.source.user_id or "",
+                    session_key=context.session_key,
+                    platform=context.source.platform.value,
+                    guild_id=context.source.guild_id or "",
+                    chat_type=context.source.chat_type or "",
+                    sensitivity="restricted" if (context.source.chat_type or "") == "dm" else "public",
+                )
+                # detect_switch() call is kept for its side effect:
+                # marking switch as announced (dedup) so the
+                # checkpoint trigger in run.py only fires once.
+                # V3 injection is via Holographic prefetch, not here.
+    except Exception:
+        pass  # never let this break the system prompt
+    # === CROSS-CHANNEL END ===
+
     # Home channels
     if context.home_channels:
         lines.append("")

@@ -2102,6 +2102,20 @@ DEFAULT_CONFIG = {
         # "hindsight", "holographic", "retaindb", "byterover".
         # Only ONE external provider is allowed at a time.
         "provider": "",
+        # === CROSS-CHANNEL START ===
+        # Cross-channel awareness — detect session switches and inject gists.
+        # See gateway/user_context_tracker.py
+        "cross_channel_awareness": False,  # opt-in default
+        "cross_channel": {
+            "window_minutes": 30,
+            "stale_threshold_hours": 2,
+            "injection_mode": "shadow",   # shadow | on-switch | off
+            "budget_minutes": 5,
+            "venue_aware": True,
+            "recency_hint_length": 200,
+            "read_timeout_sec": 0.05,
+        },
+        # === CROSS-CHANNEL END ===
     },
 
     # Subagent delegation — override the provider:model used by delegate_task

@@ -2398,6 +2398,7 @@ class BasePlatformAdapter(ABC):
         # Chats where typing indicator is paused (e.g. during approval waits).
         # _keep_typing skips send_typing when the chat_id is in this set.
         self._typing_paused: set = set()
+        self._delivery_router: Optional[Any] = None
 
     @property
     def message_len_fn(self) -> Callable[[str], int]:
@@ -2859,6 +2860,17 @@ class BasePlatformAdapter(ABC):
         thread replies without explicit mentions).
         """
         self._session_store = session_store
+    
+    def set_delivery_router(self, router: Any) -> None:
+        """
+        Set the delivery router for cross-platform message delivery.
+        
+        Allows this adapter to send outbound messages on other platforms
+        (e.g., NATS inbox → Discord DM for human-addressed messages).
+        The router provides deliver(content, targets) to route through
+        any connected platform adapter.
+        """
+        self._delivery_router = router
     
     @abstractmethod
     async def connect(self, *, is_reconnect: bool = False) -> bool:

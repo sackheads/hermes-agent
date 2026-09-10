@@ -2388,6 +2388,18 @@ def sanitize_api_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
         filtered.append(msg)
     messages = filtered
 
+    # --- Strip empty tool_calls arrays from assistant messages ---
+    # DeepSeek rejects an assistant message whose ``tool_calls`` key is present
+    # but empty: HTTP 400 "Invalid 'messages[N].tool_calls': empty array.
+    # Expected an array with minimum length 1, but got an empty array instead."
+    # DeepSeek emits this empty array when it aborts a tool-call turn mid-stream;
+    # the value then persists into history and poisons every subsequent request
+    # (including fallback-provider retries).  An empty array is semantically
+    # identical to "no tool calls" — drop the key so strict providers accept it.
+    for _msg in messages:
+        if _msg.get("role") == "assistant" and _msg.get("tool_calls") == []:
+            _msg.pop("tool_calls", None)
+
     # --- Repair tool_calls whose function.name is empty/missing ---
     # Some providers (and partially-streamed responses) emit a tool_call with
     # id="call_xxx" but function.name="". Downstream Responses-API adapters
