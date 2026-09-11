@@ -272,6 +272,10 @@ mcp = ["mcp==2.0.0", "httpx2==2.7.0", "starlette==1.3.1"]  # starlette: CVE-2026
 # Backwards-compatible no-op alias. Relay is a core dependency on supported
 # wheel targets and intentionally unavailable on other platforms.
 nemo-relay = []
+# Fleet: the nats-inbox plugin (inter-agent coordination) needs nats-py at
+# gateway startup. Declared as an extra (not core) so it's tracked by uv and
+# survives `uv sync` — a bare `uv sync` used to strip it, killing NATS inbox.
+nats = ["nats-py==2.15.0"]
 homeassistant = ["aiohttp==3.14.3"]
 sms = ["aiohttp==3.14.3"]
 teams = ["microsoft-teams-apps==2.0.13.4", "aiohttp==3.14.3"]  # aiohttp 3.14.3: prior CVEs + GHSA-cq5v-8q36-5273/GHSA-mfx4-hv73-q22v/GHSA-mq44-7p77-q5h7
@@ -317,6 +321,7 @@ termux-all = [
   "hermes-agent[sms]",
   "hermes-agent[web]",
   "hermes-agent[pty]",
+  "hermes-agent[nats]",
 ]
 dingtalk = ["dingtalk-stream==0.24.3", "alibabacloud-dingtalk==2.2.42", "qrcode==7.4.2"]
 feishu = ["lark-oapi==1.6.8", "qrcode==7.4.2"]
