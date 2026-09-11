@@ -321,7 +321,6 @@ termux-all = [
   "hermes-agent[sms]",
   "hermes-agent[web]",
   "hermes-agent[pty]",
-  "hermes-agent[nats]",
 ]
 dingtalk = ["dingtalk-stream==0.24.3", "alibabacloud-dingtalk==2.2.42", "qrcode==7.4.2"]
 feishu = ["lark-oapi==1.6.8", "qrcode==7.4.2"]
@@ -383,6 +382,7 @@ all = [
   "hermes-agent[google]",
   "hermes-agent[web]",
   "hermes-agent[youtube]",
+  "hermes-agent[nats]",
 ]
 
 [build-system]
