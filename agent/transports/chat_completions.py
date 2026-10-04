@@ -139,7 +139,7 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
         return None
     effort = str(reasoning_config.get("effort", "medium") or "medium").strip().lower()
     if reasoning_config.get("enabled") is False or effort == "none":
-        return {"includeThoughts": False}
+        return {"thinkingBudget": 0}
     thinking_config: dict[str, Any] = {"includeThoughts": True}
     # Gemini 2.5 takes thinkingBudget; don't guess one from coarse effort levels.
     if normalized_model.startswith("gemini-2.5-"):

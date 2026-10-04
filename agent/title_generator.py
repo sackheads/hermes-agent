@@ -204,9 +204,25 @@ def _extract_title_text(content: str) -> str:
     return _strip_title_prefix(_first_line(raw)).strip("\"'").strip()
 
 
+def _is_garbage_title(text: str) -> bool:
+    """Return True if text is a code block, JSON fragment, or unparsed schema artifact."""
+    if not text:
+        return True
+    t = text.strip()
+    if t.startswith("```") or t.endswith("```") or "`" in t:
+        return True
+    if t.startswith(("{", "}", "[", "]")) or t.endswith(("{", "}", "[", "]")):
+        return True
+    if re.search(r'"title"\s*:', t) or t.startswith('{"title') or t.startswith('"title"'):
+        return True
+    return False
+
+
 def _clean_title(text: str) -> Optional[str]:
     """Normalize a model-produced title, or None when nothing usable remains."""
     title = _strip_title_prefix(" ".join((text or "").split()).strip("\"'").strip()).rstrip(".!,;:")
+    if _is_garbage_title(title):
+        return None
     if len(title) > 80:
         title = title[:77].rstrip() + "..."
     return title or None
@@ -266,7 +282,8 @@ def generate_title(
             messages=[{"role": "system", "content": prompt}, {"role": "user", "content": user_snippet}],
             # A title is a handful of tokens; a larger ceiling let chatty models burn seconds.
             max_tokens=64, temperature=0.3, timeout=timeout, main_runtime=main_runtime,
-            extra_body={"response_format": _TITLE_RESPONSE_FORMAT},
+            reasoning_config={"enabled": False, "effort": "none"},
+            extra_body={"response_format": _TITLE_RESPONSE_FORMAT, "thinking_config": {"thinkingBudget": 0}},
         )
         title = _clean_title(_extract_title_text(response.choices[0].message.content or ""))
         # Answer-shaped output guard: titling is a 3-7 word task, so a title with many words is a model that

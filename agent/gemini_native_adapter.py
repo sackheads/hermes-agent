@@ -657,9 +657,14 @@ class GeminiNativeClient:
         top_p: Optional[float] = None, stop: Any = None, extra_body: Optional[Dict[str, Any]] = None, timeout: Any = None, **_: Any,
     ) -> Any:
         extra = extra_body if isinstance(extra_body, dict) else {}
+        thinking_cfg = extra.get("thinking_config") or extra.get("thinkingConfig")
+        if not thinking_cfg:
+            reasoning = extra.get("reasoning")
+            if reasoning in ("none", False) or (isinstance(reasoning, dict) and reasoning.get("enabled") is False):
+                thinking_cfg = {"thinkingBudget": 0}
         request = build_gemini_request(
             messages=messages or [], tools=tools, tool_choice=tool_choice, temperature=temperature, max_tokens=max_tokens,
-            top_p=top_p, stop=stop, thinking_config=extra.get("thinking_config") or extra.get("thinkingConfig"), model=model,
+            top_p=top_p, stop=stop, thinking_config=thinking_cfg, model=model,
         )
         model = bare_gemini_model_id(model)
         url = f"{self.base_url}/models/{model}:"

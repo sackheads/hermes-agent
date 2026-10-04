@@ -127,6 +127,25 @@ class TestGenerateTitle:
         with patch("agent.title_generator.call_llm", return_value=mock_response):
             assert generate_title("question", "answer") == "Investigate the title resolver bug"
 
+    @pytest.mark.parametrize("malformed", [
+        "```json\n",
+        "```json\n{\"title\": \"broken",
+        "{\"title\"",
+        "{\"title\": \"data structure/\n",
+        "```",
+        "{",
+        "}",
+        "[]",
+    ])
+    def test_rejects_malformed_json_and_fences(self, malformed):
+        """Broken JSON fragments and markdown code fences must be rejected (romar#317)."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = malformed
+
+        with patch("agent.title_generator.call_llm", return_value=mock_response):
+            assert generate_title("hello world") is None
+
 
 
     def test_invokes_failure_callback_on_exception(self):
