@@ -1204,6 +1204,20 @@ DEFAULT_CONFIG = {
         # External memory provider plugin (empty = built-in only); only ONE at a time: "openviking",
         # "mem0", "hindsight", "holographic", "retaindb", "byterover".
         "provider": "",
+        # === CROSS-CHANNEL START ===
+        # Cross-channel awareness — detect session switches and inject gists.
+        # See gateway/user_context_tracker.py
+        "cross_channel_awareness": False,  # opt-in default
+        "cross_channel": {
+            "window_minutes": 30,
+            "stale_threshold_hours": 2,
+            "injection_mode": "shadow",   # shadow | on-switch | off
+            "budget_minutes": 5,
+            "venue_aware": True,
+            "recency_hint_length": 200,
+            "read_timeout_sec": 0.05,
+        },
+        # === CROSS-CHANNEL END ===
     },
     # Subagent delegation — override the provider:model used by delegate_task so children run on a
     # cheaper/faster model. Uses the same runtime provider resolution as CLI/gateway startup, so
