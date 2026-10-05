@@ -1868,6 +1868,7 @@ class BasePlatformAdapter(ABC):
         self._typing_paused: set = set()
         # Per-chat status phrase; the regular _keep_typing refresh renders it (no extra API calls).
         self._status_text: Dict[str, str] = {}
+        self._delivery_router: Optional[Any] = None
 
     @property
     def message_len_fn(self) -> Callable[[str], int]:
@@ -2384,6 +2385,27 @@ class BasePlatformAdapter(ABC):
             # Best-effort/fail-open: never let a lookup failure kill media delivery.
             _fail_open("Media-delivery history lookup failed for", exc_info=True)
             return None
+
+    def set_session_store(self, session_store: Any) -> None:
+        """
+        Set the session store for checking active sessions.
+        
+        Used by adapters that need to check if a thread/conversation
+        has an active session before processing messages (e.g., Slack
+        thread replies without explicit mentions).
+        """
+        self._session_store = session_store
+    
+    def set_delivery_router(self, router: Any) -> None:
+        """
+        Set the delivery router for cross-platform message delivery.
+        
+        Allows this adapter to send outbound messages on other platforms
+        (e.g., NATS inbox → Discord DM for human-addressed messages).
+        The router provides deliver(content, targets) to route through
+        any connected platform adapter.
+        """
+        self._delivery_router = router
 
     @abstractmethod
     async def connect(self, *, is_reconnect: bool = False) -> bool:
