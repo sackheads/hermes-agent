@@ -1970,6 +1970,7 @@ class BasePlatformAdapter(ABC):
         self._typing_paused: set = set()
         # Per-chat status phrase; the regular _keep_typing refresh renders it (no extra API calls).
         self._status_text: dict[str, str] = {}
+        self._delivery_router: Optional[Any] = None
 
     @property
     def message_len_fn(self) -> Callable[[str], int]:
@@ -2390,6 +2391,15 @@ class BasePlatformAdapter(ABC):
         """Set the session store (e.g. Slack checks for an active thread session
         before handling un-mentioned replies)."""
         self._session_store = session_store
+
+    def set_delivery_router(self, router: Any) -> None:
+        """Set the delivery router for cross-platform message delivery.
+
+        Allows this adapter to send outbound messages on other platforms
+        (e.g., NATS inbox → Discord DM for human-addressed messages). The
+        router provides deliver(content, targets) to route through any
+        connected platform adapter."""
+        self._delivery_router = router
 
     def set_owner_profile(self, profile_name: Optional[str]) -> None:
         """Declare the owning multiplex profile (secondary profiles only); read by
