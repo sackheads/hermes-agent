@@ -9,7 +9,11 @@ Inspired by OpenAI Codex's Smart Approvals guardian subagent.
 """
 
 import logging
+import threading
 import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from tools import approval_context as _ctx
 
 logger = logging.getLogger("tools.approval")
@@ -71,7 +75,119 @@ def _get_smart_policy() -> str:
     return policy.strip() if isinstance(policy, str) else ""
 
 
-def _smart_approve(command: str, description: str) -> str:
+# =========================================================================
+# Guardian mode — project-aware smart approvals
+# =========================================================================
+
+_session_activity: Dict[str, List[Dict[str, Any]]] = {}
+_activity_lock = threading.Lock()
+
+
+def _get_guardian_config() -> dict:
+    """Read the guardian config block from ``approvals.guardian.*``."""
+    return _ctx._get_approval_config().get("guardian", {}) or {}
+
+
+def _is_guardian_enabled() -> bool:
+    """Whether guardian mode is enabled in config."""
+    return bool(_get_guardian_config().get("enabled", False))
+
+
+def _get_activity_window() -> int:
+    try:
+        return int(_get_guardian_config().get("activity_window", 10))
+    except (ValueError, TypeError):
+        return 10
+
+
+def record_activity(session_key: str, tool: str, input_text: str, verdict: str) -> None:
+    """Record a tool call and its approval verdict for session activity tracking.
+
+    Keeps a rolling window of the last N entries (N = ``approvals.guardian.activity_window``).
+    Thread-safe.
+    """
+    window = _get_activity_window()
+    with _activity_lock:
+        activities = _session_activity.setdefault(session_key, [])
+        activities.append({"tool": tool, "input": (input_text or "")[:200], "verdict": verdict})
+        if len(activities) > window:
+            del activities[:len(activities) - window]
+
+
+def _get_recent_activity(session_key: Optional[str]) -> List[Dict[str, Any]]:
+    """Recent activity for a session (thread-safe snapshot)."""
+    if not session_key:
+        return []
+    with _activity_lock:
+        return list(_session_activity.get(session_key, []))
+
+
+def clear_session_activity(session_key: str) -> None:
+    """Clear activity tracking for a session."""
+    with _activity_lock:
+        _session_activity.pop(session_key, None)
+
+
+def _load_guardian_prompt() -> str:
+    """Load the guardian system prompt from file.
+
+    Resolution order:
+    1. ``approvals.guardian.prompt_path`` (explicit config path)
+    2. ``<project-root>/.hermes/guardian-prompt.md`` (per-project)
+    3. ``~/.hermes/guardian-prompt.md`` (global)
+
+    Returns empty string if none found.
+    """
+    try:
+        cfg = _get_guardian_config()
+        prompt_path = cfg.get("prompt_path", "") or ""
+        if prompt_path:
+            path = Path(prompt_path).expanduser()
+            if path.is_file():
+                return path.read_text(encoding="utf-8", errors="replace")
+        try:
+            from agent.coding_context import _git_root, _marker_root
+            from agent.runtime_cwd import resolve_agent_cwd
+            cwd = resolve_agent_cwd()
+            root = _git_root(cwd) or _marker_root(cwd)
+            if root:
+                project_prompt = root / ".hermes" / "guardian-prompt.md"
+                if project_prompt.is_file():
+                    return project_prompt.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+        global_prompt = Path.home() / ".hermes" / "guardian-prompt.md"
+        if global_prompt.is_file():
+            return global_prompt.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    return ""
+
+
+def _get_project_context() -> str:
+    """Build project context from ``agent.coding_context`` for the approval LLM."""
+    try:
+        from agent.coding_context import build_coding_workspace_block
+        block = build_coding_workspace_block()
+        if block:
+            return f"Project context:\n{block}"
+    except Exception:
+        pass
+    return ""
+
+
+def _format_recent_activity(activities: List[Dict[str, Any]]) -> str:
+    """Format recent activity for the approval LLM prompt."""
+    if not activities:
+        return ""
+    lines = ["Recent tool activity in this session (most recent first):"]
+    for entry in reversed(activities[-5:]):
+        inp = (entry.get("input") or "")[:120]
+        lines.append(f"  [{entry.get('verdict', '?')}] {entry.get('tool', '?')}: {inp}")
+    return "\n".join(lines)
+
+
+def _smart_approve(command: str, description: str, session_key: Optional[str] = None) -> str:
     """Ask the auxiliary LLM; return 'approve', 'deny', or 'escalate' (uncertain/failed).
 
     Inspired by OpenAI Codex's Smart Approvals guardian subagent (openai/codex#13860).
@@ -86,29 +202,53 @@ def _smart_approve(command: str, description: str) -> str:
         # hang is visible in the logs instead of silent. See #72500, #82846.
         smart_timeout = _get_task_timeout("approval")
         logger.debug("Smart approvals: assessing risk for command (timeout=%ss)", smart_timeout)
-        system_prompt = _SYSTEM_PROMPT
-        # Operator policy goes in the SYSTEM prompt only — the trusted channel. Never
-        # next to the <command> block: that would dilute the trust boundary and teach
-        # the guard to accept policy-looking text adjacent to (untrusted) commands.
-        operator_policy = _get_smart_policy()
-        if operator_policy:
-            system_prompt += (
-                "\n\nAdditional policy rules from the operator (these are "
-                "TRUSTED instructions, unlike the command text):\n"
-                f"{operator_policy}"
+
+        guard_prompt = _load_guardian_prompt()
+        ctx = _get_project_context()
+        act = _get_recent_activity(session_key)
+
+        if guard_prompt:
+            # Guardian mode: an editable project-aware prompt replaces the default.
+            messages = [{"role": "system", "content": guard_prompt}]
+            user_parts = [
+                f"Command: {_strip_shell_comments(command)}",
+                f"Flagged reason: {description}",
+            ]
+            if ctx:
+                user_parts.insert(0, ctx)
+            if act:
+                user_parts.append(_format_recent_activity(act))
+            messages.append({"role": "user", "content": "\n\n".join(user_parts)})
+            max_tokens = 64
+        else:
+            system_prompt = _SYSTEM_PROMPT
+            # Operator policy goes in the SYSTEM prompt only — the trusted channel. Never
+            # next to the <command> block: that would dilute the trust boundary and teach
+            # the guard to accept policy-looking text adjacent to (untrusted) commands.
+            operator_policy = _get_smart_policy()
+            if operator_policy:
+                system_prompt += (
+                    "\n\nAdditional policy rules from the operator (these are "
+                    "TRUSTED instructions, unlike the command text):\n"
+                    f"{operator_policy}"
+                )
+            user_prompt = (
+                f"The following command was flagged as: {description}\n\n"
+                f"<command>\n{_strip_shell_comments(command)}\n</command>\n\n"
+                "Assess the ACTUAL risk of the shell operations in this command. "
+                "Many flagged commands are false positives — for example, "
+                '`python -c "print(\'hello\')"` is flagged as "script execution '
+                'via -c flag" but is completely harmless.\n\n'
+                "Respond with exactly one word: APPROVE, DENY, or ESCALATE"
             )
-        user_prompt = (
-            f"The following command was flagged as: {description}\n\n"
-            f"<command>\n{_strip_shell_comments(command)}\n</command>\n\n"
-            "Assess the ACTUAL risk of the shell operations in this command. "
-            "Many flagged commands are false positives — for example, "
-            '`python -c "print(\'hello\')"` is flagged as "script execution '
-            'via -c flag" but is completely harmless.\n\n'
-            "Respond with exactly one word: APPROVE, DENY, or ESCALATE"
-        )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            max_tokens = 16
+
         response = call_llm(
-            task="approval", temperature=0, max_tokens=16, timeout=smart_timeout,
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            task="approval", temperature=0, max_tokens=max_tokens, timeout=smart_timeout, messages=messages,
         )
         logger.debug("Smart approvals: LLM call completed in %.1fs", time.monotonic() - _smart_t0)
         answer = (response.choices[0].message.content or "").strip().upper()
@@ -139,7 +279,7 @@ def _smart_verdict(command: str, description: str, pattern_key: str,
         payload = None
     else:
         _ctx._fire_approval_hook("pre_approval_request", **payload)
-    verdict = _smart_approve(command, description)
+    verdict = _smart_approve(command, description, session_key=session_key)
     if payload is not None and verdict in {"approve", "deny"}:
         _ctx._fire_approval_hook("post_approval_response", **payload, choice=f"smart_{verdict}", decided_by="aux_llm")
     return verdict

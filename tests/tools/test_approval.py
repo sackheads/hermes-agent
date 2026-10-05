@@ -62,7 +62,7 @@ class TestSmartApproval:
             lambda: {"mode": "smart"},
         )
         monkeypatch.setattr(approval_module, "_YOLO_MODE_FROZEN", False)
-        monkeypatch.setattr(approval_smart, "_smart_approve", lambda *_: "approve")
+        monkeypatch.setattr(approval_smart, "_smart_approve", lambda *_, **__: "approve")
         monkeypatch.setattr(
             "tools.tirith_security.check_command_security",
             lambda _command: {"action": "allow", "findings": [], "summary": ""},

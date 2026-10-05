@@ -1556,6 +1556,16 @@ DEFAULT_CONFIG = {
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,
+        # Guardian mode — project-aware smart approvals with an editable prompt file.
+        # enabled: inject workspace snapshot + recent verdict history into the approval LLM prompt.
+        # activity_window: how many recent tool+verdict entries the guardian sees.
+        # prompt_path: explicit guardian prompt path (else <project>/.hermes/guardian-prompt.md,
+        #   then ~/.hermes/guardian-prompt.md).
+        "guardian": {
+            "enabled": False,
+            "activity_window": 10,
+            "prompt_path": "",
+        },
         # Case-insensitive fnmatch globs against terminal commands; a match blocks even under --yolo
         # / mode=off. Quote in YAML when starting with * or containing {}/!/: e.g. "git push
         # --force*".
