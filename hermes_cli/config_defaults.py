@@ -1715,6 +1715,17 @@ DEFAULT_CONFIG = {
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,
+        # vibecop Guardian mode (fleet) — project-aware smart approvals with an editable prompt file.
+        # enabled: inject a workspace snapshot + recent verdict history into the approval LLM prompt
+        #   (only when a prompt file is also present). Distinct from upstream's guardian concept.
+        # activity_window: how many recent tool+verdict entries the vibecop prompt sees.
+        # prompt_path: explicit vibecop prompt path (else <project>/.hermes/vibecop-prompt.md,
+        #   then ~/.hermes/vibecop-prompt.md).
+        "vibecop": {
+            "enabled": False,
+            "activity_window": 10,
+            "prompt_path": "",
+        },
         # Case-insensitive fnmatch globs against terminal commands; a match blocks even under --yolo
         # / mode=off. Quote in YAML when starting with * or containing {}/!/: e.g. "git push
         # --force*".

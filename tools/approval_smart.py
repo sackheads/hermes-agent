@@ -120,9 +120,30 @@ def _smart_approve(command: str, description: str) -> str:
             'via -c flag" but is completely harmless.\n\n'
             "Respond with exactly one word: APPROVE, DENY, or ESCALATE"
         )
+        # === VIBECOP START ===
+        # Fleet patch: vibecop Guardian mode replaces the default prompt with an
+        # editable project-aware one (workspace snapshot + recent verdict history)
+        # when enabled and a prompt file is present. Falls through to upstream's
+        # default otherwise. See tools/vibecop_guardian.py and docs/fleet/PATCHES.md.
+        try:
+            from tools import vibecop_guardian as _vibecop
+            _vc = _vibecop.build_messages(command, description, _ctx.get_current_session_key())
+        except Exception as _vc_exc:
+            logger.debug("Smart approvals: vibecop hook failed (%s: %s), using default prompt",
+                         type(_vc_exc).__name__, _vc_exc)
+            _vc = None
+        if _vc is not None:
+            messages, max_tokens = _vc
+        else:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            max_tokens = 16
+        # === VIBECOP END ===
         response = call_llm(
-            task="approval", temperature=0, max_tokens=16, timeout=smart_timeout,
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            task="approval", temperature=0, max_tokens=max_tokens, timeout=smart_timeout,
+            messages=messages,
             reasoning_config=_verdict_reasoning(),
         )
         logger.debug("Smart approvals: LLM call completed in %.1fs", time.monotonic() - _smart_t0)
@@ -165,6 +186,16 @@ def _smart_verdict(command: str, description: str, pattern_key: str,
     else:
         _ctx._fire_approval_hook("pre_approval_request", **payload)
     verdict = _smart_approve(command, description)
+    # === VIBECOP START ===
+    # Record the smart-approval verdict so vibecop's recent-activity context (and
+    # `hermes vibecop refine`) have signal. Best-effort: never block the verdict.
+    try:
+        from tools import vibecop_guardian as _vibecop
+        _vibecop.record_activity(session_key, "terminal", command, verdict)
+    except Exception as _vc_exc:
+        logger.debug("Smart approvals: vibecop activity recording failed (%s: %s)",
+                     type(_vc_exc).__name__, _vc_exc)
+    # === VIBECOP END ===
     if payload is not None and verdict in {"approve", "deny"}:
         _ctx._fire_approval_hook("post_approval_response", **payload, choice=f"smart_{verdict}", decided_by="aux_llm")
     return verdict

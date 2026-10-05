@@ -365,6 +365,7 @@ from hermes_cli.subcommands.doctor import build_doctor_parser
 from hermes_cli.subcommands.verify import build_verify_parser
 from hermes_cli.subcommands.security import build_security_parser
 from hermes_cli.subcommands.approvals import build_approvals_parser
+from hermes_cli.subcommands.vibecop import build_vibecop_parser
 from hermes_cli.subcommands.dump import build_dump_parser
 from hermes_cli.subcommands.debug import build_debug_parser
 from hermes_cli.subcommands.backup import build_backup_parser
@@ -2169,6 +2170,13 @@ def cmd_approvals(args):
     return status
 
 
+def cmd_vibecop(args):
+    """Dispatch `hermes vibecop <subcmd>` (fleet vibecop Guardian mode)."""
+    from hermes_cli.vibecop_cmd import cmd_vibecop as _vibecop_cmd
+
+    return _vibecop_cmd(args)
+
+
 def cmd_config(args):
     """Configuration management."""
     from hermes_cli.config import config_command
@@ -3349,6 +3357,7 @@ def _build_cli_parser():
     build_verify_parser(subparsers, cmd_verify=cmd_verify)
     build_security_parser(subparsers, cmd_security=cmd_security)
     build_approvals_parser(subparsers, cmd_approvals=cmd_approvals)
+    build_vibecop_parser(subparsers, cmd_vibecop=cmd_vibecop)
     build_dump_parser(subparsers, cmd_dump=cmd_dump)
     build_debug_parser(subparsers, cmd_debug=cmd_debug)
     build_backup_parser(subparsers, cmd_backup=cmd_backup)
