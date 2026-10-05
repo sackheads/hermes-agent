@@ -2301,6 +2301,7 @@ all = [
     { name = "httplib2" },
     { name = "httpx2" },
     { name = "mcp" },
+    { name = "nats-py" },
     { name = "pyasn1" },
     { name = "python-multipart" },
     { name = "starlette" },
@@ -2405,6 +2406,9 @@ mistral = [
 ]
 modal = [
     { name = "modal" },
+]
+nats = [
+    { name = "nats-py" },
 ]
 otlp = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
@@ -2586,6 +2590,7 @@ requires-dist = [
     { name = "hermes-agent", extras = ["google"], marker = "extra == 'termux-all'" },
     { name = "hermes-agent", extras = ["mcp"], marker = "extra == 'all'" },
     { name = "hermes-agent", extras = ["mcp"], marker = "extra == 'termux'" },
+    { name = "hermes-agent", extras = ["nats"], marker = "extra == 'all'" },
     { name = "hermes-agent", extras = ["pty"], marker = "extra == 'all'" },
     { name = "hermes-agent", extras = ["pty"], marker = "extra == 'termux-all'" },
     { name = "hermes-agent", extras = ["sms"], marker = "extra == 'all'" },
@@ -2612,6 +2617,7 @@ requires-dist = [
     { name = "misaki", extras = ["en"], marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'kittentts') or (platform_machine != 'ARM64' and sys_platform == 'win32' and extra == 'kittentts') or (sys_platform != 'darwin' and sys_platform != 'win32' and extra == 'kittentts')", git = "https://github.com/NousResearch/misaki.git?rev=f03fd2be7346952a83d3d4845c217fc7667f322d" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = "==2.4.8" },
     { name = "modal", marker = "extra == 'modal'", specifier = "==1.5.5" },
+    { name = "nats-py", marker = "extra == 'nats'", specifier = "==2.15.0" },
     { name = "nemo-relay", marker = "(python_full_version >= '3.14' and platform_machine == 'aarch64' and 'android' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and 'android' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')", specifier = ">=0.10,<0.11" },
     { name = "neutts", extras = ["all"], marker = "python_full_version < '3.14' and extra == 'neutts'", specifier = "==1.4.1" },
     { name = "numpy", marker = "extra == 'audio-io'", specifier = "==2.4.3" },
@@ -2693,7 +2699,7 @@ requires-dist = [
     { name = "winrt-windows-services-store", marker = "python_full_version >= '3.14' and sys_platform == 'win32'", specifier = ">=3.2.1,<4" },
     { name = "youtube-transcript-api", marker = "extra == 'youtube'", specifier = "==1.2.4" },
 ]
-provides-extras = ["uvloop", "anthropic", "exa", "firecrawl", "parallel-web", "ddgs", "fal", "edge-tts", "neutts", "kittentts", "piper", "modal", "daytona", "vercel", "google-meet", "messaging", "cron", "slack", "matrix", "wecom", "tts-premium", "voice", "wake", "telegram", "discord", "stt-whisper", "audio-io", "silk", "wake-openwakeword", "wake-sherpa", "wake-porcupine", "google-chat", "doc-extract", "trace-upload", "vision", "pty", "mcp", "nemo-relay", "sms", "teams", "computer-use", "acp", "mistral", "otlp", "bedrock", "vertex", "azure-identity", "termux", "termux-all", "dingtalk", "feishu", "google", "youtube", "web", "all"]
+provides-extras = ["uvloop", "anthropic", "exa", "firecrawl", "parallel-web", "ddgs", "fal", "edge-tts", "neutts", "kittentts", "piper", "modal", "daytona", "vercel", "google-meet", "messaging", "cron", "slack", "matrix", "wecom", "tts-premium", "voice", "wake", "telegram", "discord", "stt-whisper", "audio-io", "silk", "wake-openwakeword", "wake-sherpa", "wake-porcupine", "google-chat", "doc-extract", "trace-upload", "vision", "pty", "mcp", "nemo-relay", "nats", "sms", "teams", "computer-use", "acp", "mistral", "otlp", "bedrock", "vertex", "azure-identity", "termux", "termux-all", "dingtalk", "feishu", "google", "youtube", "web", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3820,6 +3826,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/2d/f9/8e360bdfc3c44e267e7e046f0e0b9922766da92da26959a6963f597e6bb5/murmurhash-1.0.15-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:4fd8189ee293a09f30f4931408f40c28ccd42d9de4f66595f8814879339378bc", size = 161811, upload-time = "2025-11-14T09:51:01.289Z" },
     { url = "https://files.pythonhosted.org/packages/f9/31/97649680595b1096803d877ababb9a67c07f4378f177ec885eea28b9db6d/murmurhash-1.0.15-cp314-cp314t-win_amd64.whl", hash = "sha256:66395b1388f7daa5103db92debe06842ae3be4c0749ef6db68b444518666cdcc", size = 29817, upload-time = "2025-11-14T09:51:02.493Z" },
     { url = "https://files.pythonhosted.org/packages/76/66/4fce8755f25d77324401886c00017c556be7ca3039575b94037aff905385/murmurhash-1.0.15-cp314-cp314t-win_arm64.whl", hash = "sha256:c22e56c6a0b70598a66e456de5272f76088bc623688da84ef403148a6d41851d", size = 26219, upload-time = "2025-11-14T09:51:03.563Z" },
+]
+
+[[package]]
+name = "nats-py"
+version = "2.15.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/f0/fc5e93f2b0dd14a202590ad9d30eda1955ea872039b5204357348d0f4b1e/nats_py-2.15.0.tar.gz", hash = "sha256:6622c547d9a7d2313d9c147d46c386188f4ec2c7b5c9f9a0438a4d1b55f54a93", size = 75995, upload-time = "2026-06-05T07:34:03.904Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/a8/b55606c7c621fb813c8ec78baf201d2c78bf6051091ec0c7ada572999e95/nats_py-2.15.0-py3-none-any.whl", hash = "sha256:9f8d36aa52a9926a88b8f1d70cf1fdce0ad387941479b500ee9ab3e51073cefd", size = 90334, upload-time = "2026-06-05T07:34:02.81Z" },
 ]
 
 [[package]]

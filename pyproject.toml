@@ -407,6 +407,10 @@ mcp = [
 # Backwards-compatible no-op alias. Relay is a core dependency on supported
 # wheel targets and intentionally unavailable on other platforms.
 nemo-relay = []
+# Fleet: the nats-inbox plugin (inter-agent coordination) needs nats-py at
+# gateway startup. Declared as an extra (not core) so it's tracked by uv and
+# survives `uv sync` — a bare `uv sync` used to strip it, killing NATS inbox.
+nats = ["nats-py==2.15.0"]
 sms = ["aiohttp==3.14.5"]
 teams = [
   "microsoft-teams-apps==2.0.13.4",
@@ -529,6 +533,7 @@ all = [
   "hermes-agent[google]",
   "hermes-agent[web]",
   "hermes-agent[youtube]",
+  "hermes-agent[nats]",
 ]
 
 [dependency-groups]
