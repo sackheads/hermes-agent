@@ -433,6 +433,22 @@ class TestChatCompletionsBuildKwargs:
         )
         assert "temperature" not in kw
 
+    def test_gemini3_omits_temperature_in_transport(self, transport):
+        """Gemini 3+ omits temperature in transport regardless of caller setting (romar#332)."""
+        from providers.base import ProviderProfile
+        msgs = [{"role": "user", "content": "Hi"}]
+        kw_g3 = transport.build_kwargs(
+            model="gemini-3.6-flash", messages=msgs, temperature=0.7,
+            provider_profile=ProviderProfile(name="gemini"),
+        )
+        assert "temperature" not in kw_g3
+
+        kw_g2 = transport.build_kwargs(
+            model="gemini-2.5-flash", messages=msgs, temperature=0.7,
+            provider_profile=ProviderProfile(name="gemini"),
+        )
+        assert kw_g2.get("temperature") == 0.7
+
 
 class TestChatCompletionsKimi:
     """Regression tests for the Kimi/Moonshot quirks migrated into the transport."""

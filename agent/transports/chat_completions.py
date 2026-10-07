@@ -184,8 +184,10 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
         # ``gemini-flash-latest`` alias); future majors are added only when the
         # API documents thinkingBudget for them. (#91927)
         config: dict[str, Any] = {"includeThoughts": False}
-        if normalized_model == "gemini-flash-latest" or normalized_model.startswith(("gemini-2.5-", "gemini-3")):
+        if normalized_model.startswith("gemini-2.5-"):
             config["thinkingBudget"] = 0
+        elif normalized_model.startswith("gemini-3") or normalized_model in ("gemini-flash-latest", "gemini-pro-latest"):
+            config["thinkingLevel"] = "minimal" if "3.6-flash" in normalized_model else "low"
         return config
     thinking_config: dict[str, Any] = {"includeThoughts": True}
     # Gemini 2.5 takes thinkingBudget; don't guess one from coarse effort levels.
@@ -196,13 +198,13 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
     # Gemini 3 Flash documents low/medium/high thinking levels; Gemini 3 Pro
     # is stricter (low/high). Clamp Hermes' wider effort set to what each
     # family accepts so we never forward an undocumented level verbatim.
-    if normalized_model.startswith("gemini-3"):
-        if "flash" in normalized_model:
+    if normalized_model.startswith("gemini-3") or normalized_model in ("gemini-flash-latest", "gemini-pro-latest"):
+        if "pro" in normalized_model:
+            thinking_config["thinkingLevel"] = "high" if effort in _HIGH_EFFORTS else "low"
+        else:
             thinking_config["thinkingLevel"] = (
                 "low" if effort in {"minimal", "low"} else "high" if effort in _HIGH_EFFORTS else "medium"
             )
-        elif "pro" in normalized_model:
-            thinking_config["thinkingLevel"] = "high" if effort in _HIGH_EFFORTS else "low"
     return thinking_config
 
 
@@ -226,9 +228,9 @@ def _raise_gemini_thinking_max_tokens(model: str, reasoning_config: dict | None,
     thinking_config = _build_gemini_thinking_config(model, reasoning_config)
     if not thinking_config:
         return requested
-    from agent.gemini_native_adapter import _effective_gemini_max_output_tokens
+    from agent.gemini_native_adapter import _effective_gemini_max_output_tokens, is_gemini3_plus
 
-    return _effective_gemini_max_output_tokens(requested, thinking_config)
+    return _effective_gemini_max_output_tokens(requested, thinking_config, is_gemini3=is_gemini3_plus(model), model=model)
 
 
 def _is_gemini_openai_compat_base_url(base_url: Any) -> bool:
@@ -351,17 +353,23 @@ def _base_kwargs(model: str, sanitized: list, tools: Any, params: dict, profile:
     """Shared ``{model, messages[, temperature][, timeout][, tools]}`` scaffold for both build paths.
 
     ``temperature`` is profile-path only: ``fixed_temperature`` beats the caller's; ``OMIT_TEMPERATURE`` sends none.
+    On Gemini 3+, custom sampling parameters are deprecated (romar#332) and omitted up front.
     """
     api_kwargs: dict[str, Any] = {"model": model, "messages": sanitized}
+    from agent.gemini_native_adapter import is_gemini_sampling_deprecated
+    is_gemini_deprecated = is_gemini_sampling_deprecated(model)
+
     if profile is not None:
         from providers.base import OMIT_TEMPERATURE
 
-        if profile.fixed_temperature is OMIT_TEMPERATURE:
+        if profile.fixed_temperature is OMIT_TEMPERATURE or is_gemini_deprecated:
             pass
         elif profile.fixed_temperature is not None:
             api_kwargs["temperature"] = profile.fixed_temperature
         elif params.get("temperature") is not None:
             api_kwargs["temperature"] = params["temperature"]
+    elif not is_gemini_deprecated and params.get("temperature") is not None:
+        api_kwargs["temperature"] = params["temperature"]
     if params.get("timeout") is not None:
         api_kwargs["timeout"] = params["timeout"]
     if tools:
