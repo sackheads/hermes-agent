@@ -378,6 +378,10 @@ _MEMORY_ROUTING_BLOCK = (
     "their size limits and crowds out the facts that matter; misrouting it puts it where the next "
     "session won't look. If the tool schema lists only one "
     "target, that store is the only one enabled — use it and skip the other.\n\n"
+    "Emit ONE memory tool call per fact — a single action per call. Never put two or more actions "
+    "in one call, and never concatenate several facts into a single call: if several facts are "
+    "worth saving, call the memory tool once per fact (one call to target='user', another to "
+    "target='memory').\n\n"
 )
 
 _MEMORY_REVIEW_PROMPT = (
