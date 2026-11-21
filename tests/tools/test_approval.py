@@ -1290,6 +1290,35 @@ class TestGitDestructiveOps:
         assert fold("GIT PUSH --FORCE origin") == "git push --FORCE origin"
         assert fold("VAR=-D git branch -D x") == "var=-d git branch -D x"
 
+    def test_git_global_options_do_not_evade_destructive_detection(self):
+        """git's global options may sit between `git` and the subcommand
+        (`git -C <dir> branch -D`, `git -c k=v reset --hard`, `--git-dir=…`),
+        so the destructive patterns must anchor on the subcommand, not on `git`
+        immediately followed by it (romar#290)."""
+        for cmd, desc in (
+            ("git -C /tmp/repo branch -D foo", "git branch force delete"),
+            ("git -C '/tmp/with space/repo' branch -D foo", "git branch force delete"),
+            ("git -c color.ui=false branch -D foo", "git branch force delete"),
+            ("git --git-dir=/tmp/.git branch -D foo", "git branch force delete"),
+            ("git -C /tmp/repo reset --hard", "git reset --hard (destroys uncommitted changes)"),
+            ("git -C /tmp/repo clean -f", "git clean with force (deletes untracked files)"),
+            ("git -C /tmp/repo push --force", "git force push (rewrites remote history)"),
+        ):
+            dangerous, _, detected = detect_dangerous_command(cmd)
+            assert dangerous is True, cmd
+            assert detected == desc, cmd
+
+        # The global-option prefix must not turn a safe command dangerous.
+        for cmd in (
+            "git -C /tmp/repo branch -d foo",
+            "git -C /tmp/repo branch --delete merged-feature",
+            "git -C /tmp/repo status",
+            "git -C /tmp/repo branch --show-current",
+        ):
+            dangerous, key, detected = detect_dangerous_command(cmd)
+            assert dangerous is False, cmd
+            assert key is None and detected is None, cmd
+
 
 class TestChmodExecuteCombo:
     """chmod +x && ./ is the two-step social engineering pattern where a

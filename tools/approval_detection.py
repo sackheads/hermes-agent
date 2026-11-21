@@ -12,6 +12,8 @@ import shlex
 import tempfile
 import unicodedata
 
+from tools.approval_git_options import _GIT
+
 logger = logging.getLogger("tools.approval")
 
 # Sensitive write targets, matched via ~ / $HOME / $HERMES_HOME spellings. The resolved absolute
@@ -445,20 +447,20 @@ DANGEROUS_PATTERNS = [
     # Git destructive operations. `git reset --hard` accepts any unambiguous long-flag prefix (--h,
     # --ha, --har): --hard is the only reset mode starting with "h", and `--help` is special-cased
     # by git before mode resolution.
-    (r'\bgit\s+reset\s+--h(?:a(?:r(?:d)?)?)?\b', "git reset --hard (destroys uncommitted changes)"),
-    (r'\bgit\s+push\b.*--forc[a-z]*\b', "git force push (rewrites remote history)"),
-    (r'\bgit\s+push\b.*-f\b', "git force push short flag (rewrites remote history)"),
-    (r'\bgit\s+clean\s+-[^\s]*f', "git clean with force (deletes untracked files)"),
+    (rf'{_GIT}reset\s+--h(?:a(?:r(?:d)?)?)?\b', "git reset --hard (destroys uncommitted changes)"),
+    (rf'{_GIT}push\b.*--forc[a-z]*\b', "git force push (rewrites remote history)"),
+    (rf'{_GIT}push\b.*-f\b', "git force push short flag (rewrites remote history)"),
+    (rf'{_GIT}clean\s+-[^\s]*f', "git clean with force (deletes untracked files)"),
     # `-D` = `-d --force`: only the capital short flag is force-delete, so the group opts out of
     # the module-wide re.IGNORECASE and relies on _lower_preserving_flags keeping dash-prefixed
     # tokens' case in the detection input (every other pattern matches case-insensitively and is
     # unaffected). The safe merged-only -d / --delete stays ungated by design — git itself refuses
     # to delete a branch that is not fully merged.
-    (r'\bgit\s+branch\s+(?-i:-D)\b', "git branch force delete"),
+    (rf'{_GIT}branch\s+(?-i:-D)\b', "git branch force delete"),
     # `-D` = `-d --force`; the long spellings are different tokens, so match delete+force in either order, bounded to
     # one command segment (no `;`/`|`/`&`/newline) so an unrelated later command isn't contaminated.
-    (r'\bgit\s+branch\b[^;|&\n]*?(?:-d\b|--delete\b)[^;|&\n]*?(?:-f\b|--force\b)', "git branch force delete (long flags)"),
-    (r'\bgit\s+branch\b[^;|&\n]*?(?:-f\b|--force\b)[^;|&\n]*?(?:-d\b|--delete\b)', "git branch force delete (long flags, force-first)"),
+    (rf'{_GIT}branch\b[^;|&\n]*?(?:-d\b|--delete\b)[^;|&\n]*?(?:-f\b|--force\b)', "git branch force delete (long flags)"),
+    (rf'{_GIT}branch\b[^;|&\n]*?(?:-f\b|--force\b)[^;|&\n]*?(?:-d\b|--delete\b)', "git branch force delete (long flags, force-first)"),
     # chmod +x then immediate run: the script content may hold dangerous commands individual patterns miss.
     (r'\bchmod\s+\+x\b.*[;&|]+\s*\./', "chmod +x followed by immediate execution"),
     # Sudo stdin/askpass/shell/list-privs flags. The agent has no TTY, so sudo invocations that succeed
@@ -501,7 +503,7 @@ _REMOVED_PATTERN_KEY_ALIASES = {
 # with stored allowlist/session entries), both ways.
 _PATTERN_KEY_ALIASES: dict[str, set[str]] = {}
 for _canonical_key, _legacy_key in [
-    (d, p.split(r'\b')[1] if r'\b' in p else p[:20]) for p, d in DANGEROUS_PATTERNS
+    (d, p.split(r'\b')[1] if r'\b' in p else p[:20]) for p, d in ((p.replace(_GIT, r'\bgit\s+'), d) for p, d in DANGEROUS_PATTERNS)
 ] + list(_REMOVED_PATTERN_KEY_ALIASES.items()):
     _PATTERN_KEY_ALIASES.setdefault(_canonical_key, set()).update({_canonical_key, _legacy_key})
     _PATTERN_KEY_ALIASES.setdefault(_legacy_key, set()).update({_legacy_key, _canonical_key})
