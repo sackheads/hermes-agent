@@ -14,14 +14,17 @@ extraction of the *original* deployed state (Sept-10 base) lives on the
 | # | Patch | Files | Why it's not upstream |
 |---|-------|-------|----------------------|
 | 1 | **cross-channel awareness** | `gateway/user_context_tracker.py`, `gateway/session.py`, `hermes_cli/commands.py`, `hermes_cli/config_defaults.py` | Detects session switches and injects cross-channel context gists. Upstream has no `user_context_tracker` module. |
-| 2 | **checkpoint trigger** | `gateway/checkpoint_trigger.py`, `tests/gateway/test_checkpoint_trigger.py` | Extracts topics/decisions/questions/artifacts when a session idles into a switch. Absent upstream. **UNWIRED** — the module ships but has no call site (tracked as `sackheads/romar#326`). |
-| 3 | **vibecop Guardian mode** | `tools/vibecop_guardian.py`, `hermes_cli/vibecop_cmd.py`, `hermes_cli/subcommands/vibecop.py`, `hermes_cli/main.py`, `hermes_cli/config_defaults.py`, `tools/approval_smart.py` | scromp's **vibecop Guardian mode** (project-aware smart approvals), ported to Python. Upstream has its *own* guardian concept (`tools/approval_smart.py`, `hermes_cli/subcommands/approvals.py`) — a different design, not a replacement. Ours lives in a standalone module (`vibecop_guardian.py`) so it never entangles with upstream's rewrite, exposes `hermes vibecop {status,init,refine}`, and reads `approvals.vibecop.*`. |
-| 4 | **relax reboot blocklist** | `tools/approval_detection.py` | Comments out the hardline `shutdown`/`reboot`/`halt`/`poweroff` patterns so Rune can legitimately reboot hosts. |
-| 5 | **cross-platform delivery router** | `gateway/platforms/base.py` | `set_session_store()` / `set_delivery_router()` on the base adapter, so the nats-inbox plugin can check active sessions and route outbound messages cross-platform. |
-| 6 | **nats extra** | `pyproject.toml`, `uv.lock`, `docs/fleet/POST_UPGRADE.md` | Declares `nats-py` as a `nats` extra (folded into `all`) so `uv sync` keeps the nats-inbox plugin's dependency. Absent upstream. |
+| 2 | **vibecop Guardian mode** | `tools/vibecop_guardian.py`, `hermes_cli/vibecop_cmd.py`, `hermes_cli/subcommands/vibecop.py`, `hermes_cli/main.py`, `hermes_cli/config_defaults.py`, `tools/approval_smart.py` | scromp's **vibecop Guardian mode** (project-aware smart approvals), ported to Python. Upstream has its *own* guardian concept (`tools/approval_smart.py`, `hermes_cli/subcommands/approvals.py`) — a different design, not a replacement. Ours lives in a standalone module (`vibecop_guardian.py`) so it never entangles with upstream's rewrite, exposes `hermes vibecop {status,init,refine}`, and reads `approvals.vibecop.*`. |
+| 3 | **relax reboot blocklist** | `tools/approval_detection.py` | Comments out the hardline `shutdown`/`reboot`/`halt`/`poweroff` patterns so Rune can legitimately reboot hosts. |
+| 4 | **cross-platform delivery router** | `gateway/platforms/base.py` | `set_session_store()` / `set_delivery_router()` on the base adapter, so the nats-inbox plugin can check active sessions and route outbound messages cross-platform. |
+| 5 | **nats extra** | `pyproject.toml`, `uv.lock`, `docs/fleet/POST_UPGRADE.md` | Declares `nats-py` as a `nats` extra (folded into `all`) so `uv sync` keeps the nats-inbox plugin's dependency. Absent upstream. |
 
-## Dropped (already upstream — do not re-apply)
+## Dropped (do not re-apply)
 
+- **checkpoint trigger (`sackheads/romar#326`)** — `gateway/checkpoint_trigger.py` and
+  `tests/gateway/test_checkpoint_trigger.py` were unwired dead code (regex-scraped
+  session switches into local `memory_store.db`). Superseded by the ratified Option 1A
+  cluster `memory-service` + out-of-band `state.db` shipper (`sackheads/romar#448`, `#463`).
 - **delegation per-task model/provider override** — upstream `tools/delegate_tool.py`
   already carries `override_provider` / `override_model`. Our PR #107717 was closed as a
   duplicate of #41843, which landed.
@@ -39,7 +42,7 @@ marked site. The sentinel is part of the patch, not decoration.
 - **vibecop Guardian mode** — `# === VIBECOP START/END ===` at the two hooks in
   `tools/approval_smart.py` (`_smart_approve` prompt selection, `_smart_verdict`
   activity recording). The bulk of the logic is isolated in `tools/vibecop_guardian.py`.
-- Remaining patches (checkpoint, reboot blocklist, delivery router, nats) are **not yet**
+- Remaining patches (reboot blocklist, delivery router, nats) are **not yet**
   sentinel-marked — a gap inherited from the original capture commit.
 
 ## Port notes (what changed vs the Sept-10 extraction)
@@ -62,4 +65,4 @@ The port re-located hooks to their upstream-refactored call sites (facade →
 3. Verify sentinels survive: `grep -rn "CROSS-CHANNEL START" gateway/` → expect ≥ 2;
    `grep -rn "VIBECOP START" tools/approval_smart.py` → expect 2.
 4. Test on one host before fleet rollout: vibecop approvals, cross-channel gist injection,
-   checkpoint trigger, nats-inbox delivery (`POST_UPGRADE.md`).
+   nats-inbox delivery (`POST_UPGRADE.md`).
