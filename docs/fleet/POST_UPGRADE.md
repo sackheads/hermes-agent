@@ -59,7 +59,7 @@ python3 -c "import json;d=json.load(open('$HOME/.hermes/gateway_state.json'));pr
 cd ~/.hermes/hermes-agent
 grep -rn "CROSS-CHANNEL START" gateway/ | wc -l               # expect >= 2
 grep -rn "VIBECOP START" tools/approval_smart.py | wc -l      # expect 2
-venv/bin/python -c "import gateway.user_context_tracker, gateway.checkpoint_trigger, tools.vibecop_guardian"
+venv/bin/python -c "import gateway.user_context_tracker, tools.vibecop_guardian"
 
 # NATS inbox consumer is push-bound
 venv/bin/python - <<'PY'

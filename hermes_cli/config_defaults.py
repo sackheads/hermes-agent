@@ -1647,6 +1647,7 @@ DEFAULT_CONFIG = {
         "denial_breaker_threshold": 3,
         # Case-insensitive fnmatch globs against terminal commands; a match blocks even under --yolo / mode=off.
         # Quote in YAML when starting with * or containing {}/!/: e.g. "git push --force*".
+        "deny": [],
         # vibecop Guardian mode (fleet) — project-aware smart approvals with an editable prompt file.
         # enabled: inject a workspace snapshot + recent verdict history into the approval LLM prompt
         #   (only when a prompt file is also present). Distinct from upstream's guardian concept.
@@ -1658,7 +1659,6 @@ DEFAULT_CONFIG = {
             "activity_window": 10,
             "prompt_path": "",
         },
-        "deny": [],
         # Who may answer a chat approval/slash confirm/clarify: ["*"] any admitted member; [] requester + admins (+ ids).
         "approvers": ["*"],
         # /reload-mcp confirms before rebuilding the MCP tool set (it invalidates the prompt cache). "Always Approve" → false.
